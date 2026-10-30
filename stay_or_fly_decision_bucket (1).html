@@ -1,0 +1,1435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stay or Fly - Decision Bucket</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter & Noto Sans Sinhala -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Sinhala:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans Sinhala', sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #eff6ff 50%, #f0fdf4 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Smooth Reveal for Weight Slider Bar */
+        .slider-reveal {
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+            transform: translateY(-8px);
+            transition: max-height 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+                        opacity 0.35s ease,
+                        transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+                        margin 0.35s ease,
+                        padding 0.35s ease;
+        }
+        .slider-reveal.open {
+            max-height: 180px;
+            opacity: 1;
+            transform: translateY(0);
+            margin-top: 0.875rem;
+            padding-top: 0.75rem;
+        }
+
+        /* Bucket Bounce & Glow Animations */
+        @keyframes bucketCatch {
+            0% { transform: scale(1) translateY(0); }
+            30% { transform: scale(1.08, 0.92) translateY(6px); }
+            60% { transform: scale(0.96, 1.04) translateY(-4px); }
+            80% { transform: scale(1.02, 0.98) translateY(2px); }
+            100% { transform: scale(1) translateY(0); }
+        }
+        .bucket-catch-anim {
+            animation: bucketCatch 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        @keyframes rippleRing {
+            0% { transform: scale(0.8); opacity: 0.85; }
+            100% { transform: scale(1.65); opacity: 0; }
+        }
+        .ripple-effect {
+            animation: rippleRing 0.65s ease-out forwards;
+        }
+
+        @keyframes floatSlow {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-6px); }
+        }
+        .bucket-float {
+            animation: floatSlow 3.8s ease-in-out infinite;
+        }
+
+        /* Custom Range Slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            appearance: none;
+            background: transparent;
+            cursor: pointer;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            height: 8px;
+            border-radius: 999px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 22px;
+            width: 22px;
+            border-radius: 50%;
+            background: #ffffff;
+            border: 3px solid currentColor;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.18);
+            margin-top: -7px;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.22);
+        }
+
+        /* Flying Capsule Animation */
+        .flying-capsule {
+            position: fixed;
+            z-index: 100;
+            pointer-events: none;
+            transition: all 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        /* Status Dot Glow */
+        .dot-blue {
+            background-color: #3b82f6;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
+        }
+        .dot-green {
+            background-color: #22c55e;
+            box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.22);
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased selection:bg-emerald-100 selection:text-emerald-900 flex flex-col min-h-screen">
+
+    <!-- Top Header: Brand + Status Dot ONLY + En/සිං Toggle -->
+    <header class="w-full max-w-2xl mx-auto pt-4 px-4 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+            <div class="w-10 h-10 rounded-2xl bg-white shadow-sm border border-slate-200/80 flex items-center justify-center text-xl">
+                ⚖️
+            </div>
+            <div>
+                <h1 id="appTitle" class="text-base sm:text-lg font-extrabold tracking-tight text-slate-900 leading-tight">
+                    Stay or Fly
+                </h1>
+                <p id="appSubtitle" class="text-xs text-slate-500 font-medium">
+                    Blind Decision Bucket
+                </p>
+            </div>
+        </div>
+
+        <!-- Right Controls: Status Dot (No Text) + En/සිං Buttons + Sheet Config & Reset -->
+        <div class="flex items-center gap-2">
+            <!-- Status Dot ONLY (Blue = Local Mode, Green = Online Google Sheets Mode) -->
+            <div id="statusDotBtn" class="openSheetSettingsModal()" title="Storage Status (Click to configure Google Sheet URL)"
+                class="w-9 h-9 rounded-xl bg-white border border-slate-200/80 shadow-sm flex items-center justify-center hover:bg-slate-50 transition-all">
+                <span id="statusDot" class="w-3 h-3 rounded-full dot-green transition-all duration-300"></span>
+        </div>
+
+            <!-- Language Switcher: En / සිං -->
+            <div class="bg-white p-1 rounded-xl border border-slate-200/80 shadow-sm flex items-center">
+                <button id="langEnBtn" onclick="setLanguage('en')"
+                    class="px-2.5 py-1 rounded-lg text-xs font-extrabold transition-all bg-slate-900 text-white">
+                    En
+                </button>
+                <button id="langSiBtn" onclick="setLanguage('si')"
+                    class="px-2.5 py-1 rounded-lg text-xs font-bold transition-all text-slate-500 hover:text-slate-800">
+                    සිං
+                </button>
+            </div>
+
+            <!-- Reset / Clear Bucket Button -->
+            <button id="clearAllBtn" title="Clear Bucket"
+                class="p-2 rounded-xl bg-white/90 hover:bg-rose-50 text-slate-400 hover:text-rose-600 border border-slate-200/80 transition-colors shadow-sm">
+                <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-1 w-full max-w-2xl mx-auto px-4 pt-4 pb-28 flex flex-col justify-between">
+
+        <!-- 1. TOP NAVIGATION TABS -->
+        <section aria-label="Decision Mode Tabs" class="my-2">
+            <div class="bg-white/90 backdrop-blur-md p-1.5 rounded-2xl shadow-sm border border-slate-200/80 grid grid-cols-2 gap-1.5 relative">
+                <!-- Tab 1: Stay in Sri Lanka -->
+                <button id="tabStay" onclick="switchTab('stay')"
+                    class="group relative flex items-center justify-center gap-2.5 py-3 px-3 rounded-xl font-semibold text-sm sm:text-base transition-all duration-300 bg-emerald-500 text-white shadow-md shadow-emerald-500/20">
+                    <span class="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center text-lg transition-transform group-hover:scale-110">
+                        🏡
+                    </span>
+                    <div class="text-left leading-tight">
+                        <div id="tabStayTitle" class="font-bold">Stay in Sri Lanka</div>
+                        <div id="tabStaySub" class="text-[11px] opacity-85 font-normal">Home & Roots</div>
+                    </div>
+                </button>
+
+                <!-- Tab 2: Go Abroad -->
+                <button id="tabAbroad" onclick="switchTab('abroad')"
+                    class="group relative flex items-center justify-center gap-2.5 py-3 px-3 rounded-xl font-semibold text-sm sm:text-base transition-all duration-300 text-slate-600 hover:bg-slate-100/80">
+                    <span class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-lg transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5">
+                        ✈️
+                    </span>
+                    <div class="text-left leading-tight">
+                        <div id="tabAbroadTitle" class="font-bold">Go Abroad</div>
+                        <div id="tabAbroadSub" class="text-[11px] opacity-75 font-normal">New Horizons</div>
+                    </div>
+                </button>
+            </div>
+        </section>
+
+        <!-- 2. VISUAL BLIND BUCKET / VAULT AREA -->
+        <section class="my-auto py-4 flex flex-col items-center justify-center relative">
+            <!-- Subtle Helper Note -->
+            <div class="mb-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/70 border border-slate-200/70 text-[11px] sm:text-xs text-slate-500 shadow-2xs">
+                <i data-lucide="eye-off" class="w-3.5 h-3.5 text-slate-400"></i>
+                <span id="blindModeNote">Past entries stay hidden until you confirm (Unbiased Mode)</span>
+            </div>
+
+            <!-- Interactive Bucket Container -->
+            <div id="bucketWrapper" class="relative flex flex-col items-center justify-center cursor-pointer select-none group" onclick="focusInput()">
+                <!-- Animated Ripple Ring on Drop -->
+                <div id="bucketRipple" class="absolute inset-0 rounded-full border-4 border-emerald-400 opacity-0 pointer-events-none"></div>
+
+                <!-- Floating SVG Bucket Graphic -->
+                <div id="bucketGraphic" class="bucket-float relative w-44 h-44 sm:w-48 sm:h-48 rounded-3xl bg-gradient-to-b from-emerald-50 to-white border-2 border-emerald-200 shadow-xl shadow-emerald-500/10 flex flex-col items-center justify-center p-4 transition-all duration-500">
+                    
+                    <!-- Top Bucket Rim Visual -->
+                    <div id="bucketRim" class="w-28 sm:w-32 h-4 rounded-full bg-emerald-500/15 border-2 border-emerald-400/50 mb-2 flex items-center justify-center overflow-hidden transition-colors duration-500">
+                        <div class="w-16 h-1 rounded-full bg-emerald-400/40"></div>
+                    </div>
+
+                    <!-- Bucket Body SVG + Icon -->
+                    <div id="bucketBody" class="relative w-24 sm:w-28 h-24 sm:h-28 rounded-b-3xl rounded-t-lg bg-gradient-to-br from-emerald-500 to-teal-600 shadow-inner flex flex-col items-center justify-center text-white transition-all duration-500">
+                        <!-- Decorative shine -->
+                        <div class="absolute top-2 left-2.5 w-2 h-14 rounded-full bg-white/20"></div>
+                        
+                        <!-- Dynamic Center Icon -->
+                        <div id="bucketCenterIcon" class="text-3xl sm:text-4xl mb-1 transform transition-transform duration-300 group-hover:scale-110">
+                            🇱🇰
+                        </div>
+                        
+                        <!-- Sealed Lock Badge inside Bucket (No items shown!) -->
+                        <div class="px-2.5 py-0.5 rounded-full bg-black/20 backdrop-blur-xs text-[11px] font-bold tracking-wide flex items-center gap-1">
+                            <i data-lucide="lock" class="w-3 h-3"></i>
+                            <span id="bucketSealedLabel">Sealed</span>
+                        </div>
+                    </div>
+
+                    <!-- Bucket Label Below -->
+                    <p id="bucketTitleLabel" class="mt-2.5 text-xs sm:text-sm font-bold text-emerald-800 tracking-tight transition-colors duration-300 text-center">
+                        Stay in Sri Lanka Bucket
+                    </p>
+                </div>
+            </div>
+
+            <!-- Subtle Drop Feedback Toast -->
+            <div id="dropToast" class="mt-3 h-5 text-xs font-semibold text-emerald-600 opacity-0 transition-opacity duration-300">
+                ✓ Dropped into bucket!
+            </div>
+        </section>
+
+        <!-- 3. INPUT CARD & DYNAMIC SLIDER BAR -->
+        <section id="inputCardSection" class="w-full">
+            <div id="inputCard" class="bg-white rounded-3xl p-4 sm:p-5 shadow-lg shadow-slate-200/70 border-2 border-emerald-500/30 transition-all duration-300">
+                
+                <!-- Input Header Label -->
+                <div class="flex items-center justify-between mb-2">
+                    <label for="reasonInput" id="inputPromptLabel" class="text-xs sm:text-sm font-bold text-emerald-700 flex items-center gap-1.5">
+                        <span id="promptDot" class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                        <span id="inputPromptText">Add a reason to stay in Sri Lanka...</span>
+                    </label>
+                    <span id="secretEntryTag" class="text-[11px] text-slate-400 font-medium">Blind Entry</span>
+                </div>
+
+                <!-- Text Input Field -->
+                <div class="relative flex items-center">
+                    <input
+                        id="reasonInput"
+                        type="text"
+                        autocomplete="off"
+                        placeholder="e.g., Being close to parents & friends..."
+                        class="w-full pl-4 pr-11 py-3.5 rounded-2xl bg-slate-50/90 border border-slate-200 focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 text-slate-800 placeholder-slate-400 text-sm sm:text-base font-medium outline-none transition-all"
+                    />
+                    <button id="clearInputBtn" onclick="clearTypedInput()" class="hidden absolute right-3 p-1.5 text-slate-400 hover:text-slate-600 rounded-lg">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+                <!-- Dynamic Weight / Impact Slider Bar (Appears ONLY when typing!) -->
+                <div id="weightSliderPanel" class="slider-reveal border-t border-slate-100">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+                            <i data-lucide="gauge" class="w-3.5 h-3.5 text-slate-400"></i>
+                            <span id="weightQuestionText">How important is this to your life?</span>
+                        </span>
+                        <span id="weightValueBadge" class="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-emerald-100 text-emerald-800">
+                            5 / 10 • Medium
+                        </span>
+                    </div>
+
+                    <div class="px-1 py-1">
+                        <input
+                            id="weightSlider"
+                            type="range"
+                            min="1"
+                            max="10"
+                            value="5"
+                            class="w-full text-emerald-600 bg-gradient-to-r from-emerald-200 via-emerald-400 to-emerald-600 rounded-lg"
+                        />
+                        <div class="flex justify-between text-[11px] text-slate-400 font-medium mt-1.5">
+                            <span id="scaleLowLabel">1 (Minor)</span>
+                            <span id="scaleMidLabel">5 (Important)</span>
+                            <span id="scaleHighLabel">10 (Life-Changing)</span>
+                        </div>
+                    </div>
+
+                    <!-- Drop to Bucket Submit Button -->
+                    <button id="dropBtn" onclick="handleDropReason()"
+                        class="mt-3 w-full py-3 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-bold text-sm sm:text-base shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 transition-all">
+                        <i data-lucide="arrow-down-to-line" class="w-4 h-4"></i>
+                        <span id="dropBtnText">Drop into Bucket</span>
+                    </button>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <!-- 4. FIXED BOTTOM CONFIRM & REVEAL PERCENTAGE BAR -->
+    <footer class="fixed bottom-0 inset-x-0 z-30 bg-white/85 backdrop-blur-lg border-t border-slate-200/80 py-3 px-4">
+        <div class="max-w-2xl mx-auto flex items-center justify-between gap-3">
+            <div class="hidden sm:flex flex-col">
+                <span id="footerReadyTitle" class="text-xs font-bold text-slate-700">Ready to see your result?</span>
+                <span id="footerReadySub" class="text-[11px] text-slate-500">Calculates weighted percentage & unlocks AI advice</span>
+            </div>
+            <button id="confirmRevealBtn" onclick="openRevealModal()"
+                class="w-full sm:w-auto flex-1 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 hover:from-emerald-600 hover:to-sky-600 text-white font-extrabold text-sm sm:text-base shadow-lg shadow-slate-900/15 flex items-center justify-center gap-2.5 transition-all duration-300 active:scale-[0.99]">
+                <i data-lucide="sparkles" class="w-5 h-5 text-amber-300"></i>
+                <span id="confirmBtnLabel">Confirm & Reveal Percentage</span>
+            </button>
+        </div>
+    </footer>
+
+    <!-- 5. REVEAL PERCENTAGE, UNSEALED BUCKETS & AI ANALYSIS MODAL -->
+    <div id="revealModal" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+        <div class="bg-white w-full max-w-3xl rounded-3xl shadow-2xl border border-slate-100 overflow-hidden my-auto max-h-[92vh] flex flex-col animate-in fade-in zoom-in-95 duration-300">
+            
+            <!-- Modal Header -->
+            <div class="px-5 py-4 bg-slate-50 border-b border-slate-200/70 flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <span class="text-2xl">🎯</span>
+                    <div>
+                        <h2 id="modalTitle" class="text-base sm:text-lg font-extrabold text-slate-900">Your Unbiased Decision Result</h2>
+                        <p id="modalSub" class="text-xs text-slate-500">Weighted Decision Breakdown & AI Advisor</p>
+                    </div>
+                </div>
+                <button onclick="closeRevealModal()" class="p-2 rounded-xl bg-white hover:bg-slate-100 text-slate-500 border border-slate-200/80 transition-colors">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <!-- Modal Scrollable Body -->
+            <div class="p-5 sm:p-6 overflow-y-auto space-y-6 flex-1">
+                
+                <!-- Empty State Warning inside Modal -->
+                <div id="emptyRevealState" class="hidden text-center py-10 px-4">
+                    <div class="w-16 h-16 rounded-2xl bg-slate-100 text-slate-400 mx-auto flex items-center justify-center text-3xl mb-3">
+                        🪣
+                    </div>
+                    <h3 id="emptyTitle" class="text-base font-bold text-slate-800">Both buckets are empty!</h3>
+                    <p id="emptySub" class="text-xs sm:text-sm text-slate-500 max-w-md mx-auto mt-1">
+                        Drop a few reasons for staying in Sri Lanka or going abroad into the bucket first, then click Confirm.
+                    </p>
+                </div>
+
+                <!-- Results Dashboard (Shown when items > 0) -->
+                <div id="resultsDashboard" class="space-y-6">
+
+                    <!-- Winner Banner -->
+                    <div id="winnerBanner" class="p-4 rounded-2xl bg-gradient-to-r from-emerald-50 via-teal-50 to-sky-50 border border-emerald-200/80 text-center">
+                        <span id="winnerEmoji" class="text-3xl block mb-1">🌟</span>
+                        <h3 id="winnerHeadline" class="text-base sm:text-lg font-extrabold text-slate-900">
+                            Calculating...
+                        </h3>
+                        <p id="winnerSubtext" class="text-xs sm:text-sm text-slate-600 mt-0.5">
+                            Based on the impact weights you assigned to each thought
+                        </p>
+                    </div>
+
+                    <!-- Big Dual Percentage Cards -->
+                    <div class="grid grid-cols-2 gap-3 sm:gap-4">
+                        <!-- Stay Percentage Card -->
+                        <div class="p-4 sm:p-5 rounded-2xl bg-emerald-50/70 border-2 border-emerald-200 flex flex-col items-center text-center relative overflow-hidden">
+                            <span class="text-2xl mb-1">🏡 🇱🇰</span>
+                            <span id="cardStayTitle" class="text-xs sm:text-sm font-bold text-emerald-900">Stay in Sri Lanka</span>
+                            <div class="text-3xl sm:text-5xl font-black text-emerald-600 tracking-tight my-1.5">
+                                <span id="stayPercentNumber">0</span>%
+                            </div>
+                            <div class="mt-1 text-[11px] font-semibold text-emerald-800 bg-emerald-100/90 px-2.5 py-1 rounded-full">
+                                <span id="stayPointsLabel">Points</span>: <span id="stayScoreStat">0</span> • (<span id="stayCountStat">0</span>)
+                            </div>
+                        </div>
+
+                        <!-- Abroad Percentage Card -->
+                        <div class="p-4 sm:p-5 rounded-2xl bg-sky-50/70 border-2 border-sky-200 flex flex-col items-center text-center relative overflow-hidden">
+                            <span class="text-2xl mb-1">✈️ 🌍</span>
+                            <span id="cardAbroadTitle" class="text-xs sm:text-sm font-bold text-sky-900">Go Abroad</span>
+                            <div class="text-3xl sm:text-5xl font-black text-sky-600 tracking-tight my-1.5">
+                                <span id="abroadPercentNumber">0</span>%
+                            </div>
+                            <div class="mt-1 text-[11px] font-semibold text-sky-800 bg-sky-100/90 px-2.5 py-1 rounded-full">
+                                <span id="abroadPointsLabel">Points</span>: <span id="abroadScoreStat">0</span> • (<span id="abroadCountStat">0</span>)
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Animated Tug-of-War Progress Bar -->
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-xs font-bold">
+                            <span id="barStayLabel" class="text-emerald-700">🇱🇰 Stay Weight</span>
+                            <span id="barAbroadLabel" class="text-sky-700">Go Abroad Weight ✈️</span>
+                        </div>
+                        <div class="w-full h-5 rounded-full bg-slate-100 p-1 flex overflow-hidden shadow-inner border border-slate-200/80">
+                            <div id="stayProgressBar" style="width: 50%" class="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-l-full transition-all duration-1000 ease-out"></div>
+                            <div id="abroadProgressBar" style="width: 50%" class="h-full bg-gradient-to-r from-sky-400 to-blue-600 rounded-r-full transition-all duration-1000 ease-out"></div>
+                        </div>
+                    </div>
+
+                    <!-- ANALYZE WITH AI SECTION -->
+                    <div class="pt-2">
+                        <button id="analyzeAiBtn" onclick="analyzeWithAI()"
+                            class="w-full py-4 px-5 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 hover:from-indigo-700 hover:via-violet-700 hover:to-sky-700 text-white font-extrabold text-sm sm:text-base shadow-xl shadow-indigo-950/15 flex items-center justify-center gap-2.5 transition-all duration-300 active:scale-[0.99] border border-indigo-400/20">
+                            <i data-lucide="sparkles" class="w-5 h-5 text-amber-300"></i>
+                            <span id="analyzeAiBtnText">Analyze with AI ✨</span>
+                        </button>
+
+                        <!-- AI Output Container -->
+                        <div id="aiAnalysisContainer" class="hidden mt-4 rounded-3xl bg-gradient-to-br from-slate-50 via-white to-indigo-50/40 border-2 border-indigo-100 p-4 sm:p-6 shadow-lg space-y-4">
+                            <div class="flex items-center justify-between border-b border-slate-200/80 pb-3">
+                                <div class="flex items-center gap-2.5">
+                                    <span class="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white flex items-center justify-center text-sm shadow-sm">✨</span>
+                                    <div>
+                                        <h4 id="aiReportTitle" class="text-xs sm:text-sm font-extrabold text-slate-900">
+                                            AI Strategic Decision Report
+                                        </h4>
+                                        <p id="aiReportSubtitle" class="text-[11px] text-slate-500">
+                                            Deep trade-off & alternative pathway analysis
+                                        </p>
+                                    </div>
+                                </div>
+                                <span class="text-[11px] font-bold px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/60">
+                                    AI Advisor
+                                </span>
+                            </div>
+                            <div id="aiAnalysisBody" class="text-xs sm:text-sm text-slate-700 leading-relaxed space-y-3.5">
+                                <!-- Populated dynamically with 4 executive insight cards -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- UNSEALED BUCKET ITEMS LIST (Visible ONLY in this reveal screen!) -->
+                    <div class="pt-3 border-t border-slate-200/80">
+                        <div class="flex items-center justify-between mb-3">
+                            <h4 class="text-xs sm:text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
+                                <i data-lucide="unlock" class="w-4 h-4 text-slate-500"></i>
+                                <span id="unsealedHeading">Unsealed Bucket Reasons</span>
+                            </h4>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <!-- Stay List Column -->
+                            <div class="bg-emerald-50/40 border border-emerald-200/70 rounded-2xl p-3.5">
+                                <div class="text-xs font-bold text-emerald-800 mb-2.5 flex items-center justify-between">
+                                    <span id="listStayHeader">🏡 Stay in Sri Lanka</span>
+                                    <span id="stayListHeaderCount" class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px]">0</span>
+                                </div>
+                                <ul id="stayReasonsList" class="space-y-2 max-h-60 overflow-y-auto pr-1"></ul>
+                            </div>
+
+                            <!-- Abroad List Column -->
+                            <div class="bg-sky-50/40 border border-sky-200/70 rounded-2xl p-3.5">
+                                <div class="text-xs font-bold text-sky-800 mb-2.5 flex items-center justify-between">
+                                    <span id="listAbroadHeader">✈️ Go Abroad</span>
+                                    <span id="abroadListHeaderCount" class="px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 text-[11px]">0</span>
+                                </div>
+                                <ul id="abroadReasonsList" class="space-y-2 max-h-60 overflow-y-auto pr-1"></ul>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-5 py-3.5 bg-slate-50 border-t border-slate-200/70 flex items-center justify-end gap-3">
+                <button onclick="closeRevealModal()"
+                    class="py-2.5 px-5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-bold flex items-center gap-2 transition-colors">
+                    <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                    <span id="modalBackBtnText">Add More Reasons</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Google Apps Script Web App URL Modal (Click Status Dot to Open) -->
+    <div id="sheetSettingsModal" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-xl border border-slate-100 space-y-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <span class="w-3 h-3 rounded-full" id="modalDotPreview"></span>
+                    <h3 class="text-sm sm:text-base font-extrabold text-slate-900">Google Sheet Web App URL</h3>
+                </div>
+                <button onclick="closeSheetSettingsModal()" class="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+            <p class="text-xs text-slate-500 leading-relaxed">
+                Paste your deployed <strong>Google Apps Script Web App URL</strong> below, or paste it directly into the highlighted <code>GOOGLE_SCRIPT_URL</code> constant inside the code.
+            </p>
+            <input id="customScriptUrlInput" type="url" placeholder="https://script.google.com/macros/s/.../exec"
+                class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-800 outline-none focus:border-emerald-500" />
+            <div class="flex items-center justify-between text-[11px] text-slate-500">
+                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block"></span> Blue = Local Mode</span>
+                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-green-500 inline-block"></span> Green = Online Sheet</span>
+            </div>
+            <div class="flex gap-2 pt-1">
+                <button onclick="saveCustomScriptUrl()" class="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold">
+                    Save & Connect
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Reset Confirmation Modal -->
+    <div id="resetConfirmModal" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-xl border border-slate-100 text-center space-y-4">
+            <div class="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 mx-auto flex items-center justify-center">
+                <i data-lucide="trash-2" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <h3 id="resetTitle" class="text-base font-extrabold text-slate-900">Clear both buckets?</h3>
+                <p id="resetSub" class="text-xs text-slate-500 mt-1">
+                    All your saved reasons will be permanently removed so you can start fresh.
+                </p>
+            </div>
+            <div class="flex gap-2.5 pt-2">
+                <button id="resetCancelBtn" onclick="closeResetModal()" class="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold">
+                    Cancel
+                </button>
+                <button id="resetConfirmBtn" onclick="confirmClearAllData()" class="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold">
+                    Yes, Clear All
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================================================================= -->
+    <!-- MAIN APPLICATION & GOOGLE SHEETS + GEMINI AI SCRIPT                     -->
+    <!-- ======================================================================= -->
+    <script>
+        // =========================================================================
+        // 🚨 PRE-CONFIGURED GOOGLE APPS SCRIPT WEB APP URL (HIGHLIGHTED) 🚨
+        // =========================================================================
+        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzgDKVdQu4SQpk5RQQt2GqREYjHhKvs8GFMR54VCjYvsDrH782qtc9bBoMfoSj3MeMe3A/exec";
+        // =========================================================================
+
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // --- App State ---
+        let currentLang = 'en'; // Default MUST be English ('en') on load
+        let activeTab = 'stay'; // 'stay' | 'abroad'
+        let entries = [];       // Array of { id, text, weight, category, createdAt }
+        let isOnlineSheetMode = true;
+        const LOCAL_STORAGE_KEY = 'stay_or_fly_bucket_entries_v2';
+        const CUSTOM_URL_STORAGE_KEY = 'stay_or_fly_google_script_url';
+
+        // --- Complete Bilingual Dictionary (English default + Sinhala) ---
+        const i18n = {
+            en: {
+                appTitle: "Stay or Fly",
+                appSubtitle: "Executive Decision Vault",
+                tabStayTitle: "Stay in Sri Lanka",
+                tabStaySub: "Home & Roots",
+                tabAbroadTitle: "Go Abroad",
+                tabAbroadSub: "Global Horizons",
+                blindModeNote: "Past entries stay hidden until you confirm (Unbiased Blind Mode)",
+                bucketSealedLabel: "Sealed Vault",
+                bucketStayLabel: "Stay in Sri Lanka Bucket",
+                bucketAbroadLabel: "Go Abroad Bucket",
+                inputPromptStay: "Add a reason to stay in Sri Lanka...",
+                inputPromptAbroad: "Add a reason to go abroad...",
+                placeholderStay: "e.g., Being close to parents, freedom, low living cost...",
+                placeholderAbroad: "e.g., Higher salary, international exposure, better system...",
+                secretEntryTag: "Unbiased Entry",
+                weightQuestionText: "How important is this factor to your life?",
+                scaleLowLabel: "1 (Minor)",
+                scaleMidLabel: "5 (Moderate)",
+                scaleHighLabel: "10 (Life-Changing)",
+                dropBtnText: "Drop into Bucket",
+                dropToast: "✓ Sealed inside bucket!",
+                footerReadyTitle: "Ready to evaluate your decision?",
+                footerReadySub: "Unlocks weighted percentages & deep AI trade-off analysis",
+                confirmBtnLabel: "Confirm & Reveal Percentage",
+                modalTitle: "Executive Decision Breakdown",
+                modalSub: "Unbiased Weighted Score & Strategic AI Advisory",
+                emptyTitle: "Both buckets are currently empty",
+                emptySub: "Drop at least a few reasons for staying in Sri Lanka or going abroad into the bucket first, then click Confirm.",
+                cardStayTitle: "Stay in Sri Lanka",
+                cardAbroadTitle: "Go Abroad",
+                pointsLabel: "Total Weight",
+                barStayLabel: "🇱🇰 Stay Weight",
+                barAbroadLabel: "Go Abroad Weight ✈️",
+                analyzeAiBtnText: "Analyze with AI ✨ (Deep Trade-Off Advisory)",
+                analyzingAiBtnText: "AI is evaluating your reasons & trade-offs...",
+                aiReportTitle: "AI Strategic Decision Report",
+                aiReportSubtitle: "Personalized trade-off & pathway analysis based on your bucket",
+                unsealedHeading: "Unsealed Bucket Reasons",
+                listStayHeader: "🏡 Stay in Sri Lanka",
+                listAbroadHeader: "✈️ Go Abroad",
+                emptyBucketList: "No reasons added to this bucket yet",
+                modalBackBtnText: "Add More Reasons",
+                resetTitle: "Clear both buckets?",
+                resetSub: "All your saved reasons will be permanently removed so you can start fresh.",
+                resetCancelBtn: "Cancel",
+                resetConfirmBtn: "Yes, Clear All",
+                winnerStay: (p) => `Your Priorities Lean Toward Staying in Sri Lanka (${p}%)`,
+                winnerStaySub: "Your blind weights show deeper value in the stability, relationships, and opportunities you have at home.",
+                winnerAbroad: (p) => `Your Priorities Lean Toward Going Abroad (${p}%)`,
+                winnerAbroadSub: "Your blind weights show a strong drive for financial growth, global exposure, and a new environment.",
+                winnerTie: "An Exact 50% – 50% Balance!",
+                winnerTieSub: "Both paths hold equal weight. Run the AI Strategic Advisor below to compare what you gain and sacrifice on each side.",
+                weightLevels: {
+                    1: "1 / 10 • Very Minor",
+                    2: "2 / 10 • Small Detail",
+                    3: "3 / 10 • Nice to Have",
+                    4: "4 / 10 • Notable Point",
+                    5: "5 / 10 • Moderately Important",
+                    6: "6 / 10 • Quite Important",
+                    7: "7 / 10 • High Impact",
+                    8: "8 / 10 • Major Priority",
+                    9: "9 / 10 • Critical Factor",
+                    10: "10 / 10 • Life-Changing!"
+                }
+            },
+            si: {
+                appTitle: "Stay or Fly",
+                appSubtitle: "තීරණ බකට් එක • Executive Vault",
+                tabStayTitle: "ලංකාවේ ඉන්නවා",
+                tabStaySub: "Stay in Sri Lanka",
+                tabAbroadTitle: "රට යනවා",
+                tabAbroadSub: "Go Abroad",
+                blindModeNote: "කලින් දාපු දේවල් ප්‍රතිශතය බලනකම් පේන්නේ නෑ (Unbiased Mode)",
+                bucketSealedLabel: "සඟවා ඇත",
+                bucketStayLabel: "ලංකාවේ ඉන්න හේතු බකට් එක",
+                bucketAbroadLabel: "රට යන්න හේතු බකට් එක",
+                inputPromptStay: "ලංකාවේ ඉන්න හිතෙන හේතුවක් හෝ වාසියක් ලියන්න...",
+                inputPromptAbroad: "රට යන්න හිතෙන හේතුවක් හෝ වාසියක් ලියන්න...",
+                placeholderStay: "උදා: දෙමව්පියෝ සහ යාලුවෝ ළඟින් ඉන්න පුළුවන්, නිදහස...",
+                placeholderAbroad: "උදා: ඉහළ වැටුපක්, අලුත් ජීවන රටාවක් සහ ඉතිරියක්...",
+                secretEntryTag: "රහස් ඇතුළත් කිරීමක්",
+                weightQuestionText: "මේ හේතුව ඔයාගේ ජීවිතේට කොච්චර වැදගත්ද?",
+                scaleLowLabel: "1 (පොඩි දෙයක්)",
+                scaleMidLabel: "5 (වැදගත්)",
+                scaleHighLabel: "10 (ජීවිතේම වෙනස් කරන)",
+                dropBtnText: "බකට් එකට දාන්න",
+                dropToast: "✓ බකට් එකට වැටුණා!",
+                footerReadyTitle: "තීරණය බලන්න ලෑස්තිද?",
+                footerReadySub: "බකට් දෙකේම ලකුණු කිරලා ප්‍රතිශතය සහ පූර්ණ AI විශ්ලේෂණය හදනවා",
+                confirmBtnLabel: "Confirm & ප්‍රතිශතය බලන්න",
+                modalTitle: "ඔයාගේ හිතේ තියෙන ඇත්තම තීරණය",
+                modalSub: "ලකුණු අනුව ප්‍රතිශතය සහ ගැඹුරු AI උපදේශනය",
+                emptyTitle: "තාම බකට් එකට කිසිම අදහසක් දාලා නෑ!",
+                emptySub: "මුලින්ම ලංකාවේ ඉන්න හෝ රට යන්න හිතෙන හේතු කිහිපයක් බකට් එකට දාලා Confirm ඔබන්න.",
+                cardStayTitle: "ලංකාවේ ඉන්නවා",
+                cardAbroadTitle: "රට යනවා",
+                pointsLabel: "මුළු ලකුණු",
+                barStayLabel: "🇱🇰 ලංකාවේ ඉන්න බර",
+                barAbroadLabel: "රට යන්න බර ✈️",
+                analyzeAiBtnText: "Analyze with AI ✨ (පූර්ණ AI විශ්ලේෂණය බලන්න)",
+                analyzingAiBtnText: "AI මගින් ඔයාගේ හේතු සහ විකල්ප විශ්ලේෂණය කරමින් පවතී...",
+                aiReportTitle: "AI වෘත්තීය සහ ජීවන තීරණ විශ්ලේෂණය",
+                aiReportSubtitle: "ඔයා දාපු හේතු අනුව දෙපැත්තේම වාසි, අවාසි සහ විකල්ප මාර්ග",
+                unsealedHeading: "බකට් දෙක ඇතුළේ තිබුණු ඔයාගේ අදහස්",
+                listStayHeader: "🏡 ලංකාවේ ඉන්න හේතු",
+                listAbroadHeader: "✈️ රට යන්න හේතු",
+                emptyBucketList: "මේ බකට් එකට තාම අදහස් දාලා නෑ",
+                modalBackBtnText: "තව අදහස් බකට් එකට දාන්න",
+                resetTitle: "බකට් දෙකම හිස් කරන්නද?",
+                resetSub: "ඔයා මේ වෙනකම් දාපු හැම අදහසක්ම මැකිලා මුල ඉඳන් පටන් ගන්නවා.",
+                resetCancelBtn: "එපා (Cancel)",
+                resetConfirmBtn: "ඔව්, මකන්න",
+                winnerStay: (p) => `ඔයාගේ හිත වැඩිපුරම බර ලංකාවේ ඉන්න! (${p}%)`,
+                winnerStaySub: "ඔයා දාපු හේතු වල බර අනුව ලංකාවේ ඉන්න එකට වැඩි වටිනාකමක් ලැබිලා තියෙනවා.",
+                winnerAbroad: (p) => `ඔයාගේ හිත වැඩිපුරම බර රට යන්න! (${p}%)`,
+                winnerAbroadSub: "ඔයා දාපු හේතු වල බර අනුව රට යන එකෙන් ජීවිතේට ලොකු වෙනසක් වෙයි කියලා පේනවා.",
+                winnerTie: "දෙපැත්තම සමානව බැලන්ස් වෙලා තියෙන්නේ! (50% - 50%)",
+                winnerTieSub: "පහළ තියෙන Analyze with AI බටන් එක ඔබලා දෙපැත්තේම ගැඹුරු විශ්ලේෂණය බලන්න.",
+                weightLevels: {
+                    1: "1 / 10 • ඉතා පොඩි දෙයක්",
+                    2: "2 / 10 • සුළු කාරණයක්",
+                    3: "3 / 10 • පොඩි වාසියක්",
+                    4: "4 / 10 • සලකා බලන්න වටින",
+                    5: "5 / 10 • සාමාන්‍යයෙන් වැදගත්",
+                    6: "6 / 10 • තරමක් වැදගත්",
+                    7: "7 / 10 • ගොඩක් වැදගත්",
+                    8: "8 / 10 • ඉතාමත් ප්‍රබල හේතුවක්",
+                    9: "9 / 10 • තීරණාත්මක සාධකයක්",
+                    10: "10 / 10 • ජීවිතේම වෙනස් කරන!"
+                }
+            }
+        };
+
+        // DOM Elements
+        const reasonInput = document.getElementById('reasonInput');
+        const clearInputBtn = document.getElementById('clearInputBtn');
+        const weightSliderPanel = document.getElementById('weightSliderPanel');
+        const weightSlider = document.getElementById('weightSlider');
+        const weightValueBadge = document.getElementById('weightValueBadge');
+        const statusDot = document.getElementById('statusDot');
+        const modalDotPreview = document.getElementById('modalDotPreview');
+
+        // Helper to get active Google Script URL (Code constant OR saved via UI modal)
+        function getActiveScriptUrl() {
+            const trimmedCodeUrl = (GOOGLE_SCRIPT_URL || "").trim();
+            if (trimmedCodeUrl) return trimmedCodeUrl;
+            return (localStorage.getItem(CUSTOM_URL_STORAGE_KEY) || "").trim();
+        }
+
+        // Update Top Status Dot (Blue = Local Mode, Green = Online Google Sheets Mode)
+        function updateStatusDot(isOnline) {
+            isOnlineSheetMode = isOnline;
+            if (isOnline) {
+                statusDot.className = "w-3 h-3 rounded-full dot-green transition-all duration-300";
+                if (modalDotPreview) modalDotPreview.className = "w-3 h-3 rounded-full dot-green";
+            } else {
+                statusDot.className = "w-3 h-3 rounded-full dot-blue transition-all duration-300";
+                if (modalDotPreview) modalDotPreview.className = "w-3 h-3 rounded-full dot-blue";
+            }
+        }
+
+        // --- 1. Initialize Storage (Google Sheets or LocalStorage Fallback) ---
+        async function initDataStore() {
+            // Load cached local entries first for instant speed
+            try {
+                const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+                if (saved) entries = JSON.parse(saved);
+            } catch (e) {
+                entries = [];
+            }
+
+            const scriptUrl = getActiveScriptUrl();
+            if (!scriptUrl) {
+                // Blue Dot = Local Mode
+                updateStatusDot(false);
+                return;
+            }
+
+            // Since valid GOOGLE_SCRIPT_URL is configured, show Green Dot immediately
+            updateStatusDot(true);
+
+            // Try connecting to Google Sheets Web App
+            try {
+                const res = await fetch(`${scriptUrl}?action=getItems`, { method: 'GET' });
+                const data = await res.json();
+                if (data && data.status === 'success' && Array.isArray(data.items)) {
+                    entries = data.items;
+                    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(entries));
+                    updateStatusDot(true);
+                }
+            } catch (err) {
+                console.warn("Google Sheet unreachable, using Local Cache:", err);
+                updateStatusDot(false);
+            }
+        }
+
+        function saveToLocalCache() {
+            try {
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(entries));
+            } catch (e) {}
+        }
+
+        // --- 2. Language Switching (En / සිං) ---
+        window.setLanguage = function(lang) {
+            currentLang = lang;
+            const t = i18n[lang];
+
+            // Toggle button active styles
+            const enBtn = document.getElementById('langEnBtn');
+            const siBtn = document.getElementById('langSiBtn');
+            if (lang === 'en') {
+                enBtn.className = "px-2.5 py-1 rounded-lg text-xs font-extrabold transition-all bg-slate-900 text-white";
+                siBtn.className = "px-2.5 py-1 rounded-lg text-xs font-bold transition-all text-slate-500 hover:text-slate-800";
+            } else {
+                siBtn.className = "px-2.5 py-1 rounded-lg text-xs font-extrabold transition-all bg-slate-900 text-white";
+                enBtn.className = "px-2.5 py-1 rounded-lg text-xs font-bold transition-all text-slate-500 hover:text-slate-800";
+            }
+
+            // Update static labels
+            document.getElementById('appTitle').textContent = t.appTitle;
+            document.getElementById('appSubtitle').textContent = t.appSubtitle;
+            document.getElementById('tabStayTitle').textContent = t.tabStayTitle;
+            document.getElementById('tabStaySub').textContent = t.tabStaySub;
+            document.getElementById('tabAbroadTitle').textContent = t.tabAbroadTitle;
+            document.getElementById('tabAbroadSub').textContent = t.tabAbroadSub;
+            document.getElementById('blindModeNote').textContent = t.blindModeNote;
+            document.getElementById('bucketSealedLabel').textContent = t.bucketSealedLabel;
+            document.getElementById('secretEntryTag').textContent = t.secretEntryTag;
+            document.getElementById('weightQuestionText').textContent = t.weightQuestionText;
+            document.getElementById('scaleLowLabel').textContent = t.scaleLowLabel;
+            document.getElementById('scaleMidLabel').textContent = t.scaleMidLabel;
+            document.getElementById('scaleHighLabel').textContent = t.scaleHighLabel;
+            document.getElementById('dropBtnText').textContent = t.dropBtnText;
+            document.getElementById('dropToast').textContent = t.dropToast;
+            document.getElementById('footerReadyTitle').textContent = t.footerReadyTitle;
+            document.getElementById('footerReadySub').textContent = t.footerReadySub;
+            document.getElementById('confirmBtnLabel').textContent = t.confirmBtnLabel;
+            document.getElementById('modalTitle').textContent = t.modalTitle;
+            document.getElementById('modalSub').textContent = t.modalSub;
+            document.getElementById('emptyTitle').textContent = t.emptyTitle;
+            document.getElementById('emptySub').textContent = t.emptySub;
+            document.getElementById('cardStayTitle').textContent = t.cardStayTitle;
+            document.getElementById('cardAbroadTitle').textContent = t.cardAbroadTitle;
+            document.getElementById('stayPointsLabel').textContent = t.pointsLabel;
+            document.getElementById('abroadPointsLabel').textContent = t.pointsLabel;
+            document.getElementById('barStayLabel').textContent = t.barStayLabel;
+            document.getElementById('barAbroadLabel').textContent = t.barAbroadLabel;
+            document.getElementById('analyzeAiBtnText').textContent = t.analyzeAiBtnText;
+            document.getElementById('aiReportTitle').textContent = t.aiReportTitle;
+            const subEl = document.getElementById('aiReportSubtitle');
+            if (subEl) subEl.textContent = t.aiReportSubtitle;
+            document.getElementById('unsealedHeading').textContent = t.unsealedHeading;
+            document.getElementById('listStayHeader').textContent = t.listStayHeader;
+            document.getElementById('listAbroadHeader').textContent = t.listAbroadHeader;
+            document.getElementById('modalBackBtnText').textContent = t.modalBackBtnText;
+            document.getElementById('resetTitle').textContent = t.resetTitle;
+            document.getElementById('resetSub').textContent = t.resetSub;
+            document.getElementById('resetCancelBtn').textContent = t.resetCancelBtn;
+            document.getElementById('resetConfirmBtn').textContent = t.resetConfirmBtn;
+
+            // Refresh Tab-dependent text
+            switchTab(activeTab);
+
+            // Refresh Modal if open
+            if (!document.getElementById('revealModal').classList.contains('hidden')) {
+                renderRevealModalContent(false);
+            }
+        };
+
+        // --- 3. Tab Switching (Stay in Sri Lanka vs Go Abroad) ---
+        window.switchTab = function(tab) {
+            activeTab = tab;
+            const t = i18n[currentLang];
+            const tabStay = document.getElementById('tabStay');
+            const tabAbroad = document.getElementById('tabAbroad');
+            const bucketGraphic = document.getElementById('bucketGraphic');
+            const bucketRim = document.getElementById('bucketRim');
+            const bucketBody = document.getElementById('bucketBody');
+            const bucketCenterIcon = document.getElementById('bucketCenterIcon');
+            const bucketTitleLabel = document.getElementById('bucketTitleLabel');
+            const inputCard = document.getElementById('inputCard');
+            const inputPromptLabel = document.getElementById('inputPromptLabel');
+            const dropBtn = document.getElementById('dropBtn');
+            const bucketRipple = document.getElementById('bucketRipple');
+
+            if (tab === 'stay') {
+                tabStay.className = "group relative flex items-center justify-center gap-2.5 py-3 px-3 rounded-xl font-semibold text-sm sm:text-base transition-all duration-300 bg-emerald-500 text-white shadow-md shadow-emerald-500/20";
+                tabAbroad.className = "group relative flex items-center justify-center gap-2.5 py-3 px-3 rounded-xl font-semibold text-sm sm:text-base transition-all duration-300 text-slate-600 hover:bg-slate-100/80";
+
+                bucketGraphic.className = "bucket-float relative w-44 h-44 sm:w-48 sm:h-48 rounded-3xl bg-gradient-to-b from-emerald-50 to-white border-2 border-emerald-200 shadow-xl shadow-emerald-500/10 flex flex-col items-center justify-center p-4 transition-all duration-500";
+                bucketRim.className = "w-28 sm:w-32 h-4 rounded-full bg-emerald-500/15 border-2 border-emerald-400/50 mb-2 flex items-center justify-center overflow-hidden transition-colors duration-500";
+                bucketBody.className = "relative w-24 sm:w-28 h-24 sm:h-28 rounded-b-3xl rounded-t-lg bg-gradient-to-br from-emerald-500 to-teal-600 shadow-inner flex flex-col items-center justify-center text-white transition-all duration-500";
+                bucketCenterIcon.textContent = "🇱🇰";
+                bucketTitleLabel.textContent = t.bucketStayLabel;
+                bucketTitleLabel.className = "mt-2.5 text-xs sm:text-sm font-bold text-emerald-800 tracking-tight transition-colors duration-300 text-center";
+                bucketRipple.className = "absolute inset-0 rounded-full border-4 border-emerald-400 opacity-0 pointer-events-none";
+
+                inputCard.className = "bg-white rounded-3xl p-4 sm:p-5 shadow-lg shadow-slate-200/70 border-2 border-emerald-500/30 transition-all duration-300";
+                inputPromptLabel.className = "text-xs sm:text-sm font-bold text-emerald-700 flex items-center gap-1.5";
+                inputPromptLabel.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500"></span><span>${t.inputPromptStay}</span>`;
+                reasonInput.placeholder = t.placeholderStay;
+                reasonInput.className = "w-full pl-4 pr-11 py-3.5 rounded-2xl bg-slate-50/90 border border-slate-200 focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 text-slate-800 placeholder-slate-400 text-sm sm:text-base font-medium outline-none transition-all";
+                weightSlider.className = "w-full text-emerald-600 bg-gradient-to-r from-emerald-200 via-emerald-400 to-emerald-600 rounded-lg";
+                dropBtn.className = "mt-3 w-full py-3 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-bold text-sm sm:text-base shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 transition-all";
+            } else {
+                tabAbroad.className = "group relative flex items-center justify-center gap-2.5 py-3 px-3 rounded-xl font-semibold text-sm sm:text-base transition-all duration-300 bg-sky-500 text-white shadow-md shadow-sky-500/20";
+                tabStay.className = "group relative flex items-center justify-center gap-2.5 py-3 px-3 rounded-xl font-semibold text-sm sm:text-base transition-all duration-300 text-slate-600 hover:bg-slate-100/80";
+
+                bucketGraphic.className = "bucket-float relative w-44 h-44 sm:w-48 sm:h-48 rounded-3xl bg-gradient-to-b from-sky-50 to-white border-2 border-sky-200 shadow-xl shadow-sky-500/10 flex flex-col items-center justify-center p-4 transition-all duration-500";
+                bucketRim.className = "w-28 sm:w-32 h-4 rounded-full bg-sky-500/15 border-2 border-sky-400/50 mb-2 flex items-center justify-center overflow-hidden transition-colors duration-500";
+                bucketBody.className = "relative w-24 sm:w-28 h-24 sm:h-28 rounded-b-3xl rounded-t-lg bg-gradient-to-br from-sky-500 to-blue-600 shadow-inner flex flex-col items-center justify-center text-white transition-all duration-500";
+                bucketCenterIcon.textContent = "✈️";
+                bucketTitleLabel.textContent = t.bucketAbroadLabel;
+                bucketTitleLabel.className = "mt-2.5 text-xs sm:text-sm font-bold text-sky-800 tracking-tight transition-colors duration-300 text-center";
+                bucketRipple.className = "absolute inset-0 rounded-full border-4 border-sky-400 opacity-0 pointer-events-none";
+
+                inputCard.className = "bg-white rounded-3xl p-4 sm:p-5 shadow-lg shadow-slate-200/70 border-2 border-sky-500/30 transition-all duration-300";
+                inputPromptLabel.className = "text-xs sm:text-sm font-bold text-sky-700 flex items-center gap-1.5";
+                inputPromptLabel.innerHTML = `<span class="w-2 h-2 rounded-full bg-sky-500"></span><span>${t.inputPromptAbroad}</span>`;
+                reasonInput.placeholder = t.placeholderAbroad;
+                reasonInput.className = "w-full pl-4 pr-11 py-3.5 rounded-2xl bg-slate-50/90 border border-slate-200 focus:bg-white focus:border-sky-500 focus:ring-4 focus:ring-sky-500/10 text-slate-800 placeholder-slate-400 text-sm sm:text-base font-medium outline-none transition-all";
+                weightSlider.className = "w-full text-sky-600 bg-gradient-to-r from-sky-200 via-sky-400 to-sky-600 rounded-lg";
+                dropBtn.className = "mt-3 w-full py-3 px-4 rounded-2xl bg-sky-600 hover:bg-sky-700 active:scale-[0.99] text-white font-bold text-sm sm:text-base shadow-md shadow-sky-600/20 flex items-center justify-center gap-2 transition-all";
+            }
+
+            updateSliderBadgeColor();
+        };
+
+        // --- 4. Dynamic Input & Slider Reveal Interaction ---
+        reasonInput.addEventListener('input', () => {
+            const hasText = reasonInput.value.trim().length > 0;
+            if (hasText) {
+                weightSliderPanel.classList.add('open');
+                clearInputBtn.classList.remove('hidden');
+            } else {
+                weightSliderPanel.classList.remove('open');
+                clearInputBtn.classList.add('hidden');
+            }
+        });
+
+        reasonInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && reasonInput.value.trim().length > 0) {
+                e.preventDefault();
+                handleDropReason();
+            }
+        });
+
+        weightSlider.addEventListener('input', () => {
+            updateSliderBadgeColor();
+        });
+
+        function updateSliderBadgeColor() {
+            const val = parseInt(weightSlider.value, 10);
+            const t = i18n[currentLang];
+            weightValueBadge.textContent = t.weightLevels[val] || `${val} / 10`;
+            if (activeTab === 'stay') {
+                weightValueBadge.className = "px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-emerald-100 text-emerald-800";
+            } else {
+                weightValueBadge.className = "px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-sky-100 text-sky-800";
+            }
+        }
+
+        window.clearTypedInput = function() {
+            reasonInput.value = '';
+            weightSlider.value = 5;
+            updateSliderBadgeColor();
+            weightSliderPanel.classList.remove('open');
+            clearInputBtn.classList.add('hidden');
+            reasonInput.focus();
+        };
+
+        window.focusInput = function() {
+            reasonInput.focus();
+        };
+
+        // --- 5. Drop into Bucket Animation & Google Sheets Sync ---
+        window.handleDropReason = async function() {
+            const text = reasonInput.value.trim();
+            if (!text) return;
+
+            const weight = parseInt(weightSlider.value, 10) || 5;
+            const category = activeTab;
+
+            // Trigger physical flying capsule animation into bucket
+            animateCapsuleToBucket(text, weight, category);
+
+            // Reset input & hide slider bar immediately
+            reasonInput.value = '';
+            weightSlider.value = 5;
+            updateSliderBadgeColor();
+            weightSliderPanel.classList.remove('open');
+            clearInputBtn.classList.add('hidden');
+
+            const newEntry = {
+                id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+                text,
+                weight,
+                category,
+                createdAt: Date.now()
+            };
+
+            entries.unshift(newEntry);
+            saveToLocalCache();
+
+            // Sync with Google Sheets if URL is configured
+            const scriptUrl = getActiveScriptUrl();
+            if (scriptUrl) {
+                try {
+                    const res = await fetch(scriptUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify({ action: 'add', item: newEntry })
+                    });
+                    const result = await res.json();
+                    updateStatusDot(result && result.status === 'success');
+                } catch (err) {
+                    console.warn("Sheet sync fallback to local:", err);
+                    updateStatusDot(false);
+                }
+            }
+        };
+
+        function animateCapsuleToBucket(text, weight, category) {
+            const inputRect = reasonInput.getBoundingClientRect();
+            const bucketEl = document.getElementById('bucketBody');
+            const bucketRect = bucketEl.getBoundingClientRect();
+
+            const capsule = document.createElement('div');
+            const isStay = category === 'stay';
+            capsule.className = `flying-capsule px-4 py-2 rounded-full font-bold text-xs sm:text-sm text-white shadow-xl flex items-center gap-2 ${
+                isStay ? 'bg-emerald-600' : 'bg-sky-600'
+            }`;
+            capsule.innerHTML = `
+                <span>${isStay ? '🏡' : '✈️'}</span>
+                <span class="max-w-[160px] truncate">${escapeHtml(text)}</span>
+                <span class="px-1.5 py-0.5 rounded-full bg-black/20 text-[10px]">+${weight}</span>
+            `;
+
+            const startX = inputRect.left + inputRect.width / 2 - 90;
+            const startY = inputRect.top;
+            capsule.style.left = `${startX}px`;
+            capsule.style.top = `${startY}px`;
+            capsule.style.transform = 'scale(1) rotate(0deg)';
+            capsule.style.opacity = '1';
+
+            document.body.appendChild(capsule);
+
+            requestAnimationFrame(() => {
+                const targetX = bucketRect.left + bucketRect.width / 2 - 90;
+                const targetY = bucketRect.top + 10;
+                capsule.style.left = `${targetX}px`;
+                capsule.style.top = `${targetY}px`;
+                capsule.style.transform = 'scale(0.25) rotate(-8deg)';
+                capsule.style.opacity = '0.15';
+            });
+
+            setTimeout(() => {
+                capsule.remove();
+                const wrapper = document.getElementById('bucketWrapper');
+                const ripple = document.getElementById('bucketRipple');
+                const toast = document.getElementById('dropToast');
+
+                wrapper.classList.remove('bucket-catch-anim');
+                ripple.classList.remove('ripple-effect');
+                void wrapper.offsetWidth;
+                wrapper.classList.add('bucket-catch-anim');
+                ripple.classList.add('ripple-effect');
+
+                toast.style.opacity = '1';
+                setTimeout(() => { toast.style.opacity = '0'; }, 1400);
+            }, 560);
+        }
+
+        // --- 6. Confirm & Reveal Percentage Modal ---
+        window.openRevealModal = function() {
+            const modal = document.getElementById('revealModal');
+            modal.classList.remove('hidden');
+            document.getElementById('aiAnalysisContainer').classList.add('hidden');
+            renderRevealModalContent(true);
+        };
+
+        window.closeRevealModal = function() {
+            document.getElementById('revealModal').classList.add('hidden');
+        };
+
+        function renderRevealModalContent(animateNumbers = true) {
+            const t = i18n[currentLang];
+            const stayItems = entries.filter(e => e.category === 'stay');
+            const abroadItems = entries.filter(e => e.category === 'abroad');
+
+            const emptyState = document.getElementById('emptyRevealState');
+            const dashboard = document.getElementById('resultsDashboard');
+
+            if (entries.length === 0) {
+                emptyState.classList.remove('hidden');
+                dashboard.classList.add('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            dashboard.classList.remove('hidden');
+
+            const stayScore = stayItems.reduce((sum, item) => sum + (Number(item.weight) || 1), 0);
+            const abroadScore = abroadItems.reduce((sum, item) => sum + (Number(item.weight) || 1), 0);
+            const totalScore = stayScore + abroadScore;
+
+            const stayPercent = totalScore > 0 ? Math.round((stayScore / totalScore) * 100) : 0;
+            const abroadPercent = totalScore > 0 ? (100 - stayPercent) : 0;
+
+            document.getElementById('stayScoreStat').textContent = stayScore;
+            document.getElementById('stayCountStat').textContent = stayItems.length;
+            document.getElementById('abroadScoreStat').textContent = abroadScore;
+            document.getElementById('abroadCountStat').textContent = abroadItems.length;
+
+            document.getElementById('stayListHeaderCount').textContent = stayItems.length;
+            document.getElementById('abroadListHeaderCount').textContent = abroadItems.length;
+
+            const winnerEmoji = document.getElementById('winnerEmoji');
+            const winnerHeadline = document.getElementById('winnerHeadline');
+            const winnerSubtext = document.getElementById('winnerSubtext');
+
+            if (stayPercent > abroadPercent) {
+                winnerEmoji.textContent = "🏡🇱🇰";
+                winnerHeadline.textContent = t.winnerStay(stayPercent);
+                winnerSubtext.textContent = t.winnerStaySub;
+            } else if (abroadPercent > stayPercent) {
+                winnerEmoji.textContent = "✈️🌍";
+                winnerHeadline.textContent = t.winnerAbroad(abroadPercent);
+                winnerSubtext.textContent = t.winnerAbroadSub;
+            } else {
+                winnerEmoji.textContent = "⚖️✨";
+                winnerHeadline.textContent = t.winnerTie;
+                winnerSubtext.textContent = t.winnerTieSub;
+            }
+
+            // Animate Progress Bars & Percentage Numbers
+            const stayBar = document.getElementById('stayProgressBar');
+            const abroadBar = document.getElementById('abroadProgressBar');
+            const stayNumEl = document.getElementById('stayPercentNumber');
+            const abroadNumEl = document.getElementById('abroadPercentNumber');
+
+            if (animateNumbers) {
+                stayBar.style.width = '50%';
+                abroadBar.style.width = '50%';
+                setTimeout(() => {
+                    stayBar.style.width = `${stayPercent}%`;
+                    abroadBar.style.width = `${abroadPercent}%`;
+                }, 60);
+                animateCounter(stayNumEl, 0, stayPercent, 750);
+                animateCounter(abroadNumEl, 0, abroadPercent, 750);
+            } else {
+                stayBar.style.width = `${stayPercent}%`;
+                abroadBar.style.width = `${abroadPercent}%`;
+                stayNumEl.textContent = stayPercent;
+                abroadNumEl.textContent = abroadPercent;
+            }
+
+            // Render Unsealed Bucket Lists
+            renderBucketList('stayReasonsList', stayItems, 'emerald', t.emptyBucketList);
+            renderBucketList('abroadReasonsList', abroadItems, 'sky', t.emptyBucketList);
+            lucide.createIcons();
+        }
+
+        function animateCounter(el, start, end, duration) {
+            const startTime = performance.now();
+            function tick(now) {
+                const progress = Math.min((now - startTime) / duration, 1);
+                const eased = 1 - Math.pow(1 - progress, 3);
+                el.textContent = Math.round(start + (end - start) * eased);
+                if (progress < 1) requestAnimationFrame(tick);
+            }
+            requestAnimationFrame(tick);
+        }
+
+        function renderBucketList(containerId, items, color, emptyText) {
+            const ul = document.getElementById(containerId);
+            if (!items || items.length === 0) {
+                ul.innerHTML = `<li class="text-xs text-slate-400 italic py-3 text-center">${escapeHtml(emptyText)}</li>`;
+                return;
+            }
+            ul.innerHTML = items.map(item => `
+                <li class="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-white border border-${color}-200/70 shadow-2xs">
+                    <span class="text-xs font-medium text-slate-700 break-words flex-1">${escapeHtml(item.text)}</span>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <span class="px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-${color}-100 text-${color}-800">
+                            ${Number(item.weight) || 1}/10
+                        </span>
+                        <button onclick="deleteBucketItem('${escapeHtml(item.id)}')" title="Remove"
+                            class="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        </button>
+                    </div>
+                </li>
+            `).join('');
+        }
+
+        // --- 7. Analyze with AI (Gemini API with Exponential Backoff & Structured 4-Card Output) ---
+        window.analyzeWithAI = async function() {
+            if (entries.length === 0) return;
+
+            const t = i18n[currentLang];
+            const btn = document.getElementById('analyzeAiBtn');
+            const btnText = document.getElementById('analyzeAiBtnText');
+            const container = document.getElementById('aiAnalysisContainer');
+            const bodyEl = document.getElementById('aiAnalysisBody');
+
+            const stayItems = entries.filter(e => e.category === 'stay');
+            const abroadItems = entries.filter(e => e.category === 'abroad');
+            const stayScore = stayItems.reduce((s, i) => s + (Number(i.weight) || 1), 0);
+            const abroadScore = abroadItems.reduce((s, i) => s + (Number(i.weight) || 1), 0);
+            const total = stayScore + abroadScore;
+            const stayPercent = total > 0 ? Math.round((stayScore / total) * 100) : 0;
+            const abroadPercent = 100 - stayPercent;
+
+            btn.disabled = true;
+            btnText.textContent = t.analyzingAiBtnText;
+            container.classList.remove('hidden');
+            bodyEl.innerHTML = `
+                <div class="flex items-center gap-3 py-4 px-3 rounded-2xl bg-indigo-50/70 text-indigo-800 font-semibold">
+                    <div class="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin shrink-0"></div>
+                    <span>${t.analyzingAiBtnText}</span>
+                </div>
+            `;
+
+            const staySummary = stayItems.map(i => `- "${i.text}" (Weight: ${i.weight}/10)`).join('\n') || 'None listed';
+            const abroadSummary = abroadItems.map(i => `- "${i.text}" (Weight: ${i.weight}/10)`).join('\n') || 'None listed';
+
+            const langInstruction = currentLang === 'si'
+                ? `Respond ENTIRELY in warm, professional, natural Sinhala (සිංහල භාෂාවෙන්). Speak directly to the user ("ඔයා...").`
+                : `Respond ENTIRELY in warm, executive, articulate English. Speak directly to the user ("You...").`;
+
+            const systemPrompt = `You are an elite Life Strategy & Career Decision Advisor specializing in helping Sri Lankan professionals decide between Staying in Sri Lanka vs Going Abroad. ${langInstruction}
+You MUST return a structured JSON object with 4 specific fields so the UI can render 4 executive insight cards.`;
+
+            const userQuery = `
+Analyze this user's blind decision bucket:
+STAY IN SRI LANKA (${stayPercent}%, Total Weight: ${stayScore}):
+${staySummary}
+
+GO ABROAD (${abroadPercent}%, Total Weight: ${abroadScore}):
+${abroadSummary}
+
+Generate a deeply personalized, realistic analysis with these 4 exact sections:
+1. "motivationBreakdown": Explain what is truly driving them based on their exact entries ("You are thinking of going abroad mainly because of [quote their abroad reasons], while [quote their stay reasons] pulls your heart to stay in Sri Lanka...").
+2. "stayInSriLankaPath": Explain how, even if they STAY in Sri Lanka, they can still achieve many of the goals they listed for going abroad (e.g., earning foreign currency via remote/freelance work, building a scalable business, upskilling, enjoying family/freedom while growing financially).
+3. "goAbroadPath": Explain the reality of GOING ABROAD—what they will miss from their Stay list (and how to manage that loss through visits, digital connection, or a 3-year target plan), balanced against the powerful advantages they will gain from their Abroad list.
+4. "finalVerdict": A clear, grounded final recommendation ("Because of these specific reasons and your ${stayPercent >= abroadPercent ? stayPercent + '% Stay' : abroadPercent + '% Go Abroad'} weight, here is what you should do...") with 2 actionable next steps.
+            `.trim();
+
+            try {
+                const structuredData = await callGeminiStructuredWithBackoff(systemPrompt, userQuery);
+                bodyEl.innerHTML = renderStructuredAiCards(structuredData);
+            } catch (err) {
+                // Deeply personalized fallback analysis engine
+                const fallbackData = buildDeepFallbackData(stayItems, abroadItems, stayPercent, abroadPercent);
+                bodyEl.innerHTML = renderStructuredAiCards(fallbackData);
+            } finally {
+                btn.disabled = false;
+                btnText.textContent = t.analyzeAiBtnText;
+                lucide.createIcons();
+            }
+        };
+
+        async function callGeminiStructuredWithBackoff(systemPrompt, userQuery) {
+            const apiKey = "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            motivationBreakdown: { type: "STRING" },
+                            stayInSriLankaPath: { type: "STRING" },
+                            goAbroadPath: { type: "STRING" },
+                            finalVerdict: { type: "STRING" }
+                        },
+                        propertyOrdering: ["motivationBreakdown", "stayInSriLankaPath", "goAbroadPath", "finalVerdict"]
+                    }
+                }
+            };
+
+            const delays = [1000, 2000, 4000];
+            for (let attempt = 0; attempt <= delays.length; attempt++) {
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    const result = await response.json();
+                    const rawJson = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (rawJson) return JSON.parse(rawJson);
+                    throw new Error("Empty JSON response");
+                } catch (e) {
+                    if (attempt === delays.length) throw e;
+                    await new Promise(r => setTimeout(r, delays[attempt]));
+                }
+            }
+        }
+
+        function renderStructuredAiCards(data) {
+            const isSi = currentLang === 'si';
+            const headers = isSi ? {
+                c1: "1. ඔයාගේ හේතු සහ යටි හිතේ අරමුණු විශ්ලේෂණය",
+                c2: "2. ලංකාවේ හිටියත් මේ ඉලක්ක ලබාගන්න පුළුවන් ක්‍රම (Stay Perspective)",
+                c3: "3. රට ගියොත් මඟහැරෙන දේවල් සහ ලැබෙන වාසි (Abroad Trade-Offs)",
+                c4: "4. අවසාන නිර්දේශය සහ ඔයා ගත යුතු පියවර"
+            } : {
+                c1: "1. Core Motivation & Priority Breakdown",
+                c2: "2. If You Stay in Sri Lanka — How to Still Achieve Your Goals",
+                c3: "3. If You Go Abroad — What You Sacrifice vs. What You Gain",
+                c4: "4. Final Strategic Verdict & Recommended Action"
+            };
+
+            return `
+                <div class="grid grid-cols-1 gap-3.5">
+                    <!-- Card 1: Core Motivation -->
+                    <div class="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs">
+                        <div class="flex items-center gap-2 font-extrabold text-slate-900 text-xs sm:text-sm mb-1.5">
+                            <span class="w-6 h-6 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center text-xs">🔍</span>
+                            <span>${headers.c1}</span>
+                        </div>
+                        <p class="text-xs sm:text-sm text-slate-600 leading-relaxed">${escapeHtml(data.motivationBreakdown)}</p>
+                    </div>
+
+                    <!-- Card 2: If You Stay in Sri Lanka -->
+                    <div class="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-200/80 shadow-2xs">
+                        <div class="flex items-center gap-2 font-extrabold text-emerald-950 text-xs sm:text-sm mb-1.5">
+                            <span class="w-6 h-6 rounded-lg bg-emerald-500 text-white flex items-center justify-center text-xs">🏡</span>
+                            <span>${headers.c2}</span>
+                        </div>
+                        <p class="text-xs sm:text-sm text-emerald-900/90 leading-relaxed">${escapeHtml(data.stayInSriLankaPath)}</p>
+                    </div>
+
+                    <!-- Card 3: If You Go Abroad -->
+                    <div class="p-4 rounded-2xl bg-sky-50/60 border border-sky-200/80 shadow-2xs">
+                        <div class="flex items-center gap-2 font-extrabold text-sky-950 text-xs sm:text-sm mb-1.5">
+                            <span class="w-6 h-6 rounded-lg bg-sky-500 text-white flex items-center justify-center text-xs">✈️</span>
+                            <span>${headers.c3}</span>
+                        </div>
+                        <p class="text-xs sm:text-sm text-sky-900/90 leading-relaxed">${escapeHtml(data.goAbroadPath)}</p>
+                    </div>
+
+                    <!-- Card 4: Final Verdict -->
+                    <div class="p-4 rounded-2xl bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-950 text-white shadow-md">
+                        <div class="flex items-center gap-2 font-extrabold text-amber-300 text-xs sm:text-sm mb-1.5">
+                            <span class="w-6 h-6 rounded-lg bg-white/10 text-amber-300 flex items-center justify-center text-xs">🎯</span>
+                            <span>${headers.c4}</span>
+                        </div>
+                        <p class="text-xs sm:text-sm text-slate-100 leading-relaxed">${escapeHtml(data.finalVerdict)}</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        function buildDeepFallbackData(stayItems, abroadItems, stayPercent, abroadPercent) {
+            const topStay = [...stayItems].sort((a, b) => b.weight - a.weight);
+            const topAbroad = [...abroadItems].sort((a, b) => b.weight - a.weight);
+
+            const stayQuotes = topStay.slice(0, 3).map(i => `"${i.text}" (${i.weight}/10)`).join(', ') || (currentLang === 'si' ? 'ලංකාවේ නිදහස සහ පවුලේ බැඳීම්' : 'family & local comfort');
+            const abroadQuotes = topAbroad.slice(0, 3).map(i => `"${i.text}" (${i.weight}/10)`).join(', ') || (currentLang === 'si' ? 'ආර්ථික ස්ථාවරත්වය සහ අලුත් අවස්ථා' : 'financial growth & global exposure');
+
+            if (currentLang === 'si') {
+                return {
+                    motivationBreakdown: `ඔයා රට යන්න ප්‍රධාන වශයෙන්ම හිතන්නේ ${abroadQuotes} වගේ ප්‍රබල හේතු නිසා. හැබැයි ඒ අතරම ලංකාවේ ඉන්න හිතෙන්නේ ${stayQuotes} කියන කාරණා ඔයාගේ ජීවිතේට ගොඩක් වටින නිසා. ලකුණු අනුව ලංකාවේ ඉන්න එකට ${stayPercent}% ක් සහ රට යන එකට ${abroadPercent}% ක බරක් ලැබිලා තියෙනවා.`,
+                    stayInSriLankaPath: `ඔයා රට යන්න හිතන ප්‍රධාන හේතු (${abroadQuotes}) දිහා බැලුවම, ලංකාවේ හිටියත් මේ දේවල් ලබාගන්න ක්‍රම තියෙනවා. උදාහරණයක් විදිහට පිටරට සමාගමක Remote Job එකක්, Freelancing හෝ අලුත් ව්‍යාපාරයක් හරහා ඩොලර් ආදායමක් හදාගත්තොත්, ${stayQuotes} කියන වටිනා දේවල් නැති කරගන්නේ නැතුවම ලංකාවේ ඉඳන් සුපිරි ජීවිතයක් ගොඩනඟා ගන්න ඔයාට පුළුවන්.`,
+                    goAbroadPath: `ඔයා රට ගියොත් ${stayQuotes} වගේ දේවල් තාවකාලිකව මඟහැරෙන එක ඇත්ත. හැබැයි ඒ වෙනුවට ඔයා බලාපොරොත්තු වෙන ${abroadQuotes} කියන වාසි සහ ජාත්‍යන්තර අත්දැකීම් ඔයාට ලැබෙනවා. අවුරුදු 2–3 ක නිශ්චිත ඉලක්කයක් තියාගෙන ගියොත් පවුලේ අයව බලන්න නිතර ලංකාවට එන්නත්, ඉක්මනින්ම ආර්ථිකව ස්ථාවර වෙන්නත් පුළුවන්.`,
+                    finalVerdict: stayPercent >= abroadPercent
+                        ? `මේ හේතුන් නිසා ඔයාට වඩාත්ම ගැළපෙන්නේ ලංකාවේ ඉන්න ගමන් (${stayPercent}% බර) ඔයාගේ ආදායම සහ වෘත්තීය මට්ටම ඊළඟ තලයට ගෙනියන එකයි. ඊළඟ මාස 6 ඇතුළත ඉහළ ආදායමක් ලබාගත හැකි අලුත් Skill එකක් හෝ Remote අවස්ථාවක් ඉලක්ක කරලා වැඩ පටන් ගන්න.`
+                        : `මේ හේතුන් නිසා ඔයාට වඩාත්ම ගැළපෙන්නේ හොඳ සැලැස්මක් ඇතුව රට යන තීරණය (${abroadPercent}% බර) ගන්න එකයි. ලංකාවේදී මඟහැරෙන දේවල් කළමනාකරණය කරගන්න පැහැදිලි අවුරුදු 3 ක සැලැස්මක් හදාගෙන රට යන වැඩ කටයුතු ඉදිරියට කරගෙන යන්න.`
+                };
+            } else {
+                return {
+                    motivationBreakdown: `You are considering going abroad primarily because of ${abroadQuotes}, while ${stayQuotes} strongly anchors you to Sri Lanka. Your unbiased blind weights resulted in ${stayPercent}% for Staying in Sri Lanka versus ${abroadPercent}% for Going Abroad.`,
+                    stayInSriLankaPath: `Even though you want to go abroad for ${abroadQuotes}, you can still achieve many of these exact goals while staying in Sri Lanka. By targeting remote international roles, export-oriented freelancing, or high-growth local ventures, you can build strong financial stability while keeping ${stayQuotes} intact.`,
+                    goAbroadPath: `If you go abroad, you will temporarily sacrifice ${stayQuotes}, which requires emotional resilience. However, in exchange, you directly unlock ${abroadQuotes}—giving you faster capital accumulation, global career exposure, and a structured lifestyle that can set up your long-term future.`,
+                    finalVerdict: stayPercent >= abroadPercent
+                        ? `Because of these specific reasons and your ${stayPercent}% weight toward home, your best strategic move is to stay in Sri Lanka while aggressively upgrading your income stream over the next 6 months so you never feel held back.`
+                        : `Because of these specific reasons and your ${abroadPercent}% weight toward going abroad, taking the leap overseas with a structured 2-to-3 year financial and career milestone plan is the right decision for you.`
+                };
+            }
+        }
+
+        // --- 8. Delete Item, Clear All & Sheet Settings Modal ---
+        window.deleteBucketItem = async function(itemId) {
+            entries = entries.filter(e => String(e.id) !== String(itemId));
+            saveToLocalCache();
+            renderRevealModalContent(false);
+
+            const scriptUrl = getActiveScriptUrl();
+            if (scriptUrl) {
+                try {
+                    await fetch(scriptUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify({ action: 'delete', id: itemId })
+                    });
+                } catch (e) {}
+            }
+        };
+
+        document.getElementById('clearAllBtn').addEventListener('click', () => {
+            if (entries.length === 0) return;
+            document.getElementById('resetConfirmModal').classList.remove('hidden');
+        });
+
+        window.closeResetModal = function() {
+            document.getElementById('resetConfirmModal').classList.add('hidden');
+        };
+
+        window.confirmClearAllData = async function() {
+            closeResetModal();
+            entries = [];
+            saveToLocalCache();
+            if (!document.getElementById('revealModal').classList.contains('hidden')) {
+                renderRevealModalContent(false);
+            }
+
+            const scriptUrl = getActiveScriptUrl();
+            if (scriptUrl) {
+                try {
+                    await fetch(scriptUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify({ action: 'clear' })
+                    });
+                } catch (e) {}
+            }
+        };
+
+        window.openSheetSettingsModal = function() {
+            document.getElementById('customScriptUrlInput').value = getActiveScriptUrl();
+            updateStatusDot(isOnlineSheetMode);
+            document.getElementById('sheetSettingsModal').classList.remove('hidden');
+        };
+
+        window.closeSheetSettingsModal = function() {
+            document.getElementById('sheetSettingsModal').classList.add('hidden');
+        };
+
+        window.saveCustomScriptUrl = async function() {
+            const val = document.getElementById('customScriptUrlInput').value.trim();
+            if (val) {
+                localStorage.setItem(CUSTOM_URL_STORAGE_KEY, val);
+            } else {
+                localStorage.removeItem(CUSTOM_URL_STORAGE_KEY);
+            }
+            closeSheetSettingsModal();
+            await initDataStore();
+        };
+
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // Initialize App on Load in English ('en')
+        setLanguage('en');
+        initDataStore();
+    </script>
+</body>
+</html>
